@@ -31,6 +31,9 @@ def main():
     }
 
     results_csv.parent.mkdir(parents=True, exist_ok=True)
+    # Reset destination file at start of benchmark run
+    if results_csv.exists():
+        results_csv.unlink()
 
     print("=== Running Experiment RQ2: Solver Comparison (SAT vs CPLEX CP vs CPLEX MIP) ===")
     for g_size, timeout in grid_configs:
@@ -40,7 +43,21 @@ def main():
             continue
 
         print(f"\n---> Running Grid Size {g_size} ({len(puzzles)} instances, Timeout={timeout}s)")
-        run_benchmark_suite(puzzles, solvers, results_csv, timeout=timeout)
+
+        # Run benchmark for current grid size into a temporary CSV file
+        temp_csv = results_csv.parent / f"temp_{g_size}.csv"
+        run_benchmark_suite(puzzles, solvers, temp_csv, timeout=timeout)
+
+        # Append temporary CSV content into the main results_csv
+        if temp_csv.exists():
+            is_first_write = not results_csv.exists()
+            with temp_csv.open("r", encoding="utf-8") as f_in, results_csv.open("a", newline="", encoding="utf-8") as f_out:
+                lines = f_in.readlines()
+                if is_first_write:
+                    f_out.writelines(lines)
+                else:
+                    f_out.writelines(lines[1:])  # Skip header row for subsequent grid sizes
+            temp_csv.unlink(missing_ok=True)
 
     print(f"\n[DONE] RQ2 results saved to: {results_csv}\n")
 
